@@ -17,19 +17,38 @@ st.write("Upload your CV and let the system find top-matching HR leadership role
 
 
 # ---------------------------------------------------------
-# 1. Upload CV
+# 1. Upload CV (PDF or DOCX)
 # ---------------------------------------------------------
 
-cv_file = st.file_uploader("📄 Upload your CV (PDF only)", type=["pdf"])
+cv_file = st.file_uploader("📄 Upload your CV (PDF or Word)", type=["pdf", "docx"])
 
 cv_text = ""
 
 if cv_file:
-    reader = PdfReader(io.BytesIO(cv_file.read()))
-    cv_text = " ".join([page.extract_text() or "" for page in reader.pages])
+
+    file_type = cv_file.name.lower()
+
+    # --- PDF Extraction ---
+    if file_type.endswith(".pdf"):
+        try:
+            reader = PdfReader(io.BytesIO(cv_file.read()))
+            cv_text = " ".join([page.extract_text() or "" for page in reader.pages])
+        except Exception as e:
+            st.error("❌ Could not extract text from PDF. Try another file.")
+            st.stop()
+
+    # --- DOCX Extraction ---
+    elif file_type.endswith(".docx"):
+        from docx import Document
+        try:
+            document = Document(io.BytesIO(cv_file.read()))
+            cv_text = "\n".join([p.text for p in document.paragraphs])
+        except Exception as e:
+            st.error("❌ Could not extract text from DOCX. Try another file.")
+            st.stop()
 
     if not cv_text.strip():
-        st.error("❌ Could not extract text from PDF. Try another file.")
+        st.error("⚠️ Could not extract readable text from the file.")
         st.stop()
 
     st.success("✅ CV uploaded and parsed successfully.")
