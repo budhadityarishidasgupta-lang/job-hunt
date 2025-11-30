@@ -161,4 +161,20 @@ def collect_jobs(keywords, countries):
     print(f"[DEBUG] EURES jobs: {len([j for j in all_jobs if j['source']=='eures'])}")
     print(f"[DEBUG] EnglishJobs jobs: {len([j for j in all_jobs if j['source']=='englishjobs.de'])}")
 
+    # HR relevance filtering (title + description)
+    HR_KEYWORDS = [
+        "hr", "human resources", "people", "talent", 
+        "shared services", "people operations", "people ops",
+        "hr director", "head of hr", "hrbp", "people director",
+        "cpo", "chief people officer"
+    ]
+
+    filtered_jobs = []
+    for job in all_jobs:
+        text = f"{job.get('title','')} {job.get('description','')}".lower()
+        if any(kw in text for kw in HR_KEYWORDS):
+            filtered_jobs.append(job)
+
+    all_jobs = filtered_jobs
+
     return all_jobs
