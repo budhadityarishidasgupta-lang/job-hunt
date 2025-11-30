@@ -8,3 +8,4 @@ pymupdf
 python-dotenv
 pandas
 python-docx==0.8.11
+openai
