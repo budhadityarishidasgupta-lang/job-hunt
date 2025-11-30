@@ -1,4 +1,4 @@
-"""Streamlit jobs page with persistent job list and feedback tracking."""
+"""Streamlit jobs page with grouped listings and scrape stats."""
 
 from __future__ import annotations
 
@@ -34,9 +34,9 @@ def fetch_jobs(keywords: str, countries: List[str]):
                 "id": _job_id(job, idx),
                 "title": job.get("title", ""),
                 "company": job.get("company", ""),
-                "location": job.get("location", ""),
+                "location": job.get("location", "Unknown"),
                 "url": job.get("url", ""),
-                "source": job.get("source", ""),
+                "source": job.get("source", "Unknown"),
                 "snippet": make_snippet(job.get("description", ""), 320),
             }
         )
@@ -60,31 +60,74 @@ countries = st.multiselect(
 if st.button("🔄 Refresh jobs"):
     st.session_state.jobs = fetch_jobs(keywords, countries)
 
-# load once and keep persistent
+# ----- Load jobs once -----
 if "jobs" not in st.session_state:
     st.session_state.jobs = fetch_jobs(keywords, countries)
+
 jobs = st.session_state.jobs
 
 if not jobs:
     st.info("No jobs loaded yet. Fetch to see listings.")
 
+# ----- Prepare stats -----
+site_stats = {}
 for job in jobs:
-    with st.expander(f"{job['title']} — {job['company']}"):
-        st.write(f"**Location:** {job['location']}")
-        st.write(f"**Source:** {job['source']}")
-        st.write(job["snippet"])
-        if job["url"]:
-            st.markdown(f"[Apply / View Posting]({job['url']})")
+    site = job.get("source", "Unknown")
+    site_stats[site] = site_stats.get(site, 0) + 1
 
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("👍", key=f"up_{job['id']}"):
-                persist_feedback(job, 1)
-                # record feedback but DO NOT remove or rebuild job list
-                render_feedback_state(job["id"], "up")
-                st.toast("Saved 👍")
-        with col2:
-            if st.button("👎", key=f"down_{job['id']}"):
-                persist_feedback(job, -1)
-                render_feedback_state(job["id"], "down")
-                st.toast("Saved 👎")
+# ----- Page Layout -----
+left, right = st.columns([0.7, 0.3])
+
+# RIGHT PANEL (30% width)
+with right:
+    st.markdown("### 📊 Scraped Jobs Summary")
+
+    for site, count in site_stats.items():
+        st.markdown(f"**{site}** — {count} postings")
+
+    st.markdown("---")
+    st.caption("Updated every scrape run")
+
+# LEFT PANEL (70% width)
+with left:
+    st.markdown("## 🔍 Job Results")
+
+    # Group jobs by job site
+    jobs_by_site = {}
+    for job in jobs:
+        src = job.get("source", "Unknown")
+        jobs_by_site.setdefault(src, []).append(job)
+
+    # Collapsible site groups
+    for site_name, site_jobs in jobs_by_site.items():
+        with st.expander(f"📁 {site_name} ({len(site_jobs)} jobs)", expanded=False):
+            # Group jobs by location inside each site
+            jobs_by_location = {}
+            for job in site_jobs:
+                loc = job.get("location", "Unknown")
+                jobs_by_location.setdefault(loc, []).append(job)
+
+            for location, location_jobs in jobs_by_location.items():
+                st.markdown(f"### 📍 {location} ({len(location_jobs)})")
+
+                for job in location_jobs:
+                    st.markdown(f"**{job['title']}**")
+                    st.write(job.get("company"))
+                    st.write(job.get("snippet", ""))
+
+                    col1, col2 = st.columns([0.15, 0.85])
+
+                    with col1:
+                        if st.button("👍", key=f"up_{job['id']}"):
+                            persist_feedback(job, 1)
+                            render_feedback_state(job["id"], "up")
+                            st.toast("Saved 👍")
+
+                        if st.button("👎", key=f"down_{job['id']}"):
+                            persist_feedback(job, -1)
+                            render_feedback_state(job["id"], "down")
+                            st.toast("Saved 👎")
+
+                    with col2:
+                        if st.button("Open Link", key=f"url_{job['id']}"):
+                            st.write(f"[Open Job Posting]({job['url']})")
