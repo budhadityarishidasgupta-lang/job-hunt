@@ -1,9 +1,8 @@
 from sentence_transformers import SentenceTransformer, util
-import numpy as np
 
 
 # ---------------------------------------------------------
-# Load embedding model (cached for performance)
+# Load MPNet embedding model (high-accuracy)
 # ---------------------------------------------------------
 
 _model = None
@@ -11,7 +10,8 @@ _model = None
 def load_model():
     global _model
     if _model is None:
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
+        # Higher quality model for CV <-> JD matching
+        _model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
     return _model
 
 
@@ -19,15 +19,10 @@ def load_model():
 # Compute match scores between CV and job descriptions
 # ---------------------------------------------------------
 
-def compute_matches(cv_text, jobs, threshold=0.55):
+def compute_matches(cv_text, jobs, threshold=0.30):
     """
-    cv_text : extracted text from CV
-    jobs    : list of normalized job dictionaries
-
-    Returns a list of:
-    {
-        title, company, source, score (0–100%), snippet, url, location
-    }
+    CV vs Job Description semantic similarity.
+    Uses all-mpnet-base-v2 for deeper matching accuracy.
     """
 
     model = load_model()
@@ -37,19 +32,13 @@ def compute_matches(cv_text, jobs, threshold=0.55):
 
     for job in jobs:
 
-        # Choose best text to compare
-        job_text = (
-            job.get("description")
-            or job.get("title")
-            or ""
-        )
+        # Use ONLY job description (title is not used for matching)
+        job_desc = job.get("description", "").strip()
 
-        if not job_text.strip():
+        if not job_desc:
             continue
 
-        job_emb = model.encode(job_text, convert_to_tensor=True)
-
-        # Cosine similarity
+        job_emb = model.encode(job_desc, convert_to_tensor=True)
         sim = util.cos_sim(cv_emb, job_emb).item()
 
         if sim < threshold:
@@ -57,7 +46,7 @@ def compute_matches(cv_text, jobs, threshold=0.55):
 
         score_pct = round(sim * 100, 2)
 
-        snippet = job_text.strip().replace("\n", " ")[:300]
+        snippet = job_desc.replace("\n", " ")[:300]
 
         results.append({
             "title": job.get("title", "Unknown"),
