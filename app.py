@@ -1,5 +1,6 @@
 import streamlit as st
 from PyPDF2 import PdfReader
+from docx import Document
 import io
 import pandas as pd
 
@@ -39,7 +40,6 @@ if cv_file:
 
     # --- DOCX Extraction ---
     elif file_type.endswith(".docx"):
-        from docx import Document
         try:
             document = Document(io.BytesIO(cv_file.read()))
             cv_text = "\n".join([p.text for p in document.paragraphs])
