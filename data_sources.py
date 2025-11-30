@@ -155,4 +155,10 @@ def collect_jobs(keywords, countries):
     if "Germany" in countries:
         all_jobs.extend(scrape_englishjobs("HR"))
 
+    print(f"[DEBUG] Arbeitnow jobs: {len([j for j in all_jobs if j['source']=='arbeitnow'])}")
+    print(f"[DEBUG] Reed jobs: {len([j for j in all_jobs if j['source']=='reed'])}")
+    print(f"[DEBUG] Indeed jobs: {len([j for j in all_jobs if j['source']=='indeed'])}")
+    print(f"[DEBUG] EURES jobs: {len([j for j in all_jobs if j['source']=='eures'])}")
+    print(f"[DEBUG] EnglishJobs jobs: {len([j for j in all_jobs if j['source']=='englishjobs.de'])}")
+
     return all_jobs
