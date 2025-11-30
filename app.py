@@ -6,6 +6,10 @@ import pandas as pd
 
 from data_sources import collect_jobs
 from matching import compute_matches
+from feedback import init_db, save_feedback, get_feedback_examples
+from llm_matcher import llm_fit_score
+
+init_db()
 
 
 # ---------------------------------------------------------
@@ -111,12 +115,58 @@ if run_search:
     df = pd.DataFrame(results)
     df_sorted = df.sort_values(by="score", ascending=False)
 
-    for _, row in df_sorted.iterrows():
+    for idx, row in df_sorted.iterrows():
+        job_dict = {
+            "title": row["title"],
+            "company": row["company"],
+            "source": row["source"],
+            "location": row["location"],
+            "url": row["url"],
+            "score": row["score"],
+            "snippet": row["snippet"],
+        }
+
         with st.expander(f"{row['score']}% — {row['title']} at {row['company']}"):
             st.write(f"**Source:** {row['source']}")
             st.write(f"**Location:** {row['location']}")
             st.write(f"**Description:**\n{row['snippet']}")
             st.markdown(f"[📩 Apply Here]({row['url']})")
+
+            col1, col2, col3 = st.columns([1, 1, 3])
+
+            # Thumbs up / down feedback
+            with col1:
+                if st.button("👍 Relevant", key=f"up_{idx}"):
+                    save_feedback(job_dict, feedback=1)
+                    st.success("Thanks! Marked as relevant.")
+
+            with col2:
+                if st.button("👎 Not relevant", key=f"down_{idx}"):
+                    save_feedback(job_dict, feedback=-1)
+                    st.info("Marked as not relevant.")
+
+            # LLM fit scoring using feedback
+            with col3:
+                if st.button("🤖 LLM Fit (beta)", key=f"llm_{idx}"):
+                    liked, disliked = get_feedback_examples()
+                    try:
+                        result = llm_fit_score(cv_text, job_dict["snippet"], liked, disliked)
+                        if result.get("score") is not None:
+                            st.write(f"**LLM Fit Score:** {result['score']}/100")
+                        if result.get("summary"):
+                            st.write(f"**Summary:** {result['summary']}")
+                        if result.get("strengths"):
+                            st.write("**Strengths:**")
+                            for s in result["strengths"]:
+                                st.write(f"- {s}")
+                        if result.get("gaps"):
+                            st.write("**Gaps / Risks:**")
+                            for g in result["gaps"]:
+                                st.write(f"- {g}")
+                    except Exception as e:
+                        st.error(
+                            "LLM scoring failed. Check your OPENAI_API_KEY in Streamlit secrets."
+                        )
 
 
     # Download all results
